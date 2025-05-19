@@ -336,7 +336,7 @@ BOOL theDialog::OnInitDialog()
 	zoom = 3;
 	UpdateZoom();
 
-	RECT r(0, 0, 80, 30);
+	CRect r(0, 0, 80, 30);
 	ccLine.Create(txt(""), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | SS_CENTER | SS_SUNKEN, r, this, IDCxColorLine);
 	ccLine.SetFont(GetFont());
 	ccBack.Create(txt(""), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | SS_CENTER | SS_SUNKEN, r, this, IDCxColorBack);
