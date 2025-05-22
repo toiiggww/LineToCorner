@@ -38,6 +38,34 @@ void theDialog::DoDataExchange(CDataExchange* pDX)
 
 void theDialog::OnOK()
 {
+	TCHAR buf[256] = {0};
+	OPENFILENAME g;
+	ZeroMemory(&g, sizeof(g));
+	g.lStructSize = sizeof(g);
+	g.hwndOwner = m_hWnd;
+	g.lpstrFile = buf;
+	g.nMaxFile = 255;
+	g.lpstrFilter = txt("bmp\0*.bmp");
+
+	if (GetSaveFileName(&g))
+	{
+		SYSTEMTIME t;
+		GetLocalTime(&t);
+		CString f = g.lpstrFile;
+		CString fn = PathFindFileName(f);
+		CString pt = f.Mid(0, f.GetLength() - fn.GetLength());
+		int ix = fn.Find(txt("."), 0);
+		if (ix > 0)
+		{
+			fn = fn.Mid(0, ix);
+		}
+		CString ff;
+		ff.Format(txt("%s%s-s-%02d-%02d-%02d-%02d-%02d.bmp"),pt.GetBuffer(), fn.GetBuffer(), t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+		SaveToImage(ff, false);
+
+		ff.Format(txt("%s%s-l-%d-%02d-%02d-%02d-%02d-%02d.bmp"), pt.GetBuffer(), fn.GetBuffer(), zoom, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+		SaveToImage(ff, true);
+	}
 }
 
 void theDialog::OnCancel()
@@ -51,7 +79,7 @@ void theDialog::DrawRect(CDC& dc)
 	CRect& r = rRange;
 	CPen pr(PS_SOLID, 3, RGB(127, 0, 0));
 	dc.SelectObject(&pr);
-	dc.Rectangle(&r);
+	//dc.Rectangle(&r);
 	int w = r.Width(), h = r.Height();
 	CPoint a = pdStart,
 		b(pdStart.x + (w <= h ? w : h) * (pdStart.x < pdEnd.x ? 1 : -1),
@@ -100,16 +128,15 @@ void theDialog::DrawRect(CDC& dc)
 
 void theDialog::DrawThumbnail(CDC& dc)
 {
-	CRect rs = &rSelect;
 	CPen sp(PS_DOT, 2, RGB(255, 0, 0));
 	dc.SelectObject(&sp);
-	CRect ro(rs.left - 2, rs.top - 2, rs.right + 2, rs.bottom + 2);
+	CRect ro(rRange.left - 2, rRange.top - 2, rRange.right + 2, rRange.bottom + 2);
 	dc.DrawFocusRect(&ro);
 
 	CPoint rlt(rRange.right + UiE.Padding, rRange.top + UiE.Padding);
-	CSize rsz(rs.Width() * zoom, rs.Height() * zoom);
+	CSize rsz(rSelect.Width() * zoom, rSelect.Height() * zoom);
 	CRect r(rlt, rsz);
-	dc.StretchBlt(r.left, r.top, r.Width(), r.Height(), &dc, rs.left, rs.top, rs.Width(), rs.Height(), SRCCOPY);
+	dc.StretchBlt(r.left, r.top, r.Width(), r.Height(), &dc, rSelect.left, rSelect.top, rSelect.Width(), rSelect.Height(), SRCCOPY);
 }
 
 void theDialog::SetEnd(const CPoint& v, CPoint& d, bool force)
@@ -119,10 +146,10 @@ void theDialog::SetEnd(const CPoint& v, CPoint& d, bool force)
 		d = v;
 	}
 	CString t;
-	t.Format(txt("%d"), pdStart.x);
+	t.Format(txt("%d"), v.x);
 	SetDlgItemText(IDCexEnd, t);
 
-	t.Format(txt("%d"), pdStart.y);
+	t.Format(txt("%d"), v.y);
 	SetDlgItemText(IDCeyEnd, t);
 
 	t.Format(txt("%d"), abs(pdEnd.x - pdStart.x));
@@ -141,7 +168,7 @@ void theDialog::SetEnd(const CPoint& v, CPoint& d, bool force)
 void theDialog::UpdateZoom()
 {
 	CString t;
-	t.Format(txt("%.4f"), zoom);
+	t.Format(txt("%d"), zoom);
 	SetDlgItemText(IDCeZoom, t);
 }
 
@@ -265,6 +292,24 @@ void theDialog::ShowMessage(LPCTSTR v, ...)
 	x += NewLine;
 	OutputDebugString(x);
 	SetDlgItemText(IDClMessage, x);
+}
+
+void theDialog::SaveToImage(const CString& n, bool z)
+{
+	CDC* pdc = GetDC();
+	CDC ndc;
+	CImage img;
+	CBitmap bmp;
+	int w = rRange.Width() * (z ? zoom : 1), h = rRange.Height() * (z ? zoom : 1);
+
+	bmp.CreateCompatibleBitmap(pdc, w, h);
+	ndc.CreateCompatibleDC(pdc);
+	ndc.SelectObject(bmp);
+	ndc.StretchBlt(0, 0, w, h, pdc, rRange.left, rRange.top, rRange.Width(), rRange.Height(), SRCCOPY);
+
+	img.Attach(bmp);
+	img.Save(n);
+	img.Detach();
 }
 
 BEGIN_MESSAGE_MAP(theDialog, CDialogEx)
@@ -463,7 +508,6 @@ void theDialog::OnPaint()
 			{
 				DrawThumbnail(pdc);
 			}
-			//pdc.SelectObject(obp);
 		}
 		isPainting = false;
 		CDialogEx::OnPaint();
@@ -483,7 +527,6 @@ void theDialog::OnRButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
 	isCapture = true;
-	//SetCapture();
 	pdStart = point;
 	CString t;
 
@@ -799,15 +842,10 @@ void theDialog::OnLButtonDown(UINT nFlags, CPoint point)
 		pmStart = point;
 		SetCursor(cuMoving);
 	}
-	else if (rRange.PtInRect(point))
+	else
 	{
 		isThumbnail = true;
 		ptStart = point;
-	}
-	else
-	{
-		ptStart.x = -1; ptStart.y = -1;
-		ptEnd.x = -1; ptEnd.y = -1;
 		rSelect.left = rSelect.top = rSelect.right = rSelect.bottom = -1;
 	}
 	CDialogEx::OnLButtonDown(nFlags, point);
@@ -822,16 +860,8 @@ void theDialog::OnLButtonUp(UINT nFlags, CPoint point)
 		isMoving = false;
 		SetCursor(cuDefault);
 	}
-	else if (rRange.PtInRect(ptStart))
-	{
-		if (!rRange.PtInRect(point))
-		{
-			point.x = point.x > ptStart.x ? rRange.right : rRange.left;
-			point.y = point.y > ptStart.x ? rRange.bottom : rRange.top;
-		}
-		SetEnd(point, ptEnd);
-		isThumbnail = false;
-	}
+	SetEnd(point, ptEnd);
+	isThumbnail = false;
 	CDialogEx::OnLButtonUp(nFlags, point);
 }
 
@@ -840,17 +870,10 @@ void theDialog::OnZoomChanged(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMUPDOWN pud = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
 	// TODO: 在此添加控件通知处理程序代码
-	if (zoom <= 1)
-	{
-		zoom = (pud->iDelta > 0 ? zoom / 2.0f : zoom * 2);
-	}
-	else if (zoom > 1 && zoom < 1.0000001)
+	zoom += (pud->iDelta > 0 ? -1 : 1);
+	if (zoom < 1.0000001)
 	{
 		zoom = 1;
-	}
-	else
-	{
-		zoom += (pud->iDelta > 0 ? -1 : 1);
 	}
 	UpdateZoom();
 	Invalidate();

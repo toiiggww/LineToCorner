@@ -40,6 +40,7 @@ protected:
 	virtual bool Next(const CRect&, const POINT&, const POINT&, POINT&);
 	virtual bool InCorner(const CRect&, const POINT&);
 	virtual void ShowMessage(LPCTSTR, ...);
+	virtual void SaveToImage(const CString&, bool);
 
 // 实现
 protected:
@@ -49,7 +50,7 @@ protected:
 	CPoint pdStart, pdEnd, ptStart, ptEnd, pmStart;
 	CRect rRange, rSelect;
 	SOCKET udpsocket;
-	float zoom;
+	int zoom;
 	COLORREF clLine, clBack;
 	ColorControl ccLine;
 	ColorControl ccBack;
